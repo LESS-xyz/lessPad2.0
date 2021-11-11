@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract PresaleFactory is IStructs, Context {
     IAdmin public immutable adminContract;
-    address public immutable presaleMaster;
+    address public presaleMaster;
 
     address[] public presales;
 
@@ -23,13 +23,18 @@ contract PresaleFactory is IStructs, Context {
     );
     event Received(address indexed from, uint256 amount);
 
-    constructor(address _adminContract, address _presaleMaster){
+    constructor(address _adminContract){
         adminContract = IAdmin(_adminContract);
-        presaleMaster = _presaleMaster;
     }
 
     receive() external payable {
         emit Received(_msgSender(), msg.value);
+    }
+
+    function setPresaleMaster(address _presaleMaster) external {
+        require(presaleMaster == address(0));
+        require(_msgSender() == adminContract.getOwner());
+        presaleMaster = _presaleMaster;
     }
 
     function createPresale(

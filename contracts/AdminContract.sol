@@ -2,8 +2,9 @@
 pragma solidity 0.8.9;
 
 import "./interfaces/IAdmin.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract AdminContract is IAdmin{
+contract AdminContract is IAdmin, Ownable{
     uint256 public creationFeeBNB = 1 ether;
     uint256 public feeOfRaisedFundsPercent = 2;
     address public feeReceiver;
@@ -15,23 +16,23 @@ contract AdminContract is IAdmin{
         feeReceiver = _feeReceiver;
     }
 
-    function setCreationFee(uint256 _fee) external {
+    function setCreationFee(uint256 _fee) external onlyOwner {
         creationFeeBNB = _fee;
     }
 
-    function setFeePercOfRaisedFunds(uint256 _feePercent) external {
+    function setFeePercOfRaisedFunds(uint256 _feePercent) external onlyOwner {
         feeOfRaisedFundsPercent = _feePercent;
     }
 
-    function setFeeReceiver(address _receiver) external {
+    function setFeeReceiver(address _receiver) external onlyOwner {
         feeReceiver = _receiver;
     }
 
-    function setDexRouter(address _dexRouter) external {
+    function setDexRouter(address _dexRouter) external onlyOwner {
         dexRouter = _dexRouter;
     }
 
-    function addOrRemoveWhitelistToken(address _token, bool _isValid) external {
+    function addOrRemoveWhitelistToken(address _token, bool _isValid) external onlyOwner {
         require(_token != address(0));
         if((_isValid && !tokensWhitelist[_token]) || (!_isValid && tokensWhitelist[_token])){
             tokensWhitelist[_token] = _isValid;
@@ -52,5 +53,9 @@ contract AdminContract is IAdmin{
 
     function getDexRouter() external view override returns(address){
         return dexRouter;
+    }
+
+    function getOwner() external view override returns(address) {
+        return owner();
     }
 }

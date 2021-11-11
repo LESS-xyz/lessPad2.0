@@ -1,9 +1,22 @@
-# Basic Sample Hardhat Project
+# LessPad2.0 Project
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+This project includes LessPad2.0 presale contracts.
 
-Try running some of the following tasks:
+To compile: 
+```shell
+npx hardhat compile
+```
+To deploy:
+```shell
+node scripts/sample-script.js
+```
 
+To test:
+```shell
+npx hardhat test
+```
+
+Another commands:
 ```shell
 npx hardhat accounts
 npx hardhat compile
