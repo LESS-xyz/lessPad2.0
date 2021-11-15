@@ -2,15 +2,17 @@
 pragma solidity 0.8.9;
 
 import "./interfaces/IAdmin.sol";
+import "./interfaces/IDEX.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract AdminContract is IAdmin, Ownable{
     uint256 public creationFeeBNB = 1 ether;
     uint256 public feeOfRaisedFundsPercent = 2;
     address public feeReceiver;
-    address public dexRouter;
 
-    mapping(address => bool) public tokensWhitelist;
+    uint256 public generalMinInvestment;
+
+    mapping(address => bool) public dexList;
 
     constructor(address _feeReceiver) {
         feeReceiver = _feeReceiver;
@@ -28,14 +30,16 @@ contract AdminContract is IAdmin, Ownable{
         feeReceiver = _receiver;
     }
 
-    function setDexRouter(address _dexRouter) external onlyOwner {
-        dexRouter = _dexRouter;
+    function setMinInvestment(uint256 _minInvestmet) external onlyOwner {
+        generalMinInvestment = _minInvestmet;
     }
 
-    function addOrRemoveWhitelistToken(address _token, bool _isValid) external onlyOwner {
-        require(_token != address(0));
-        if((_isValid && !tokensWhitelist[_token]) || (!_isValid && tokensWhitelist[_token])){
-            tokensWhitelist[_token] = _isValid;
+    function addOrRemoveDex(address _dex, bool _isValid) external onlyOwner {
+        require(_dex != address(0), "ZERO");
+        if((_isValid && !dexList[_dex]) || (!_isValid && dexList[_dex])){
+            if(_isValid)
+                require(_checkRouter(_dex), "INVALID DEX ADDRESS");
+            dexList[_dex] = _isValid;
         }
     }
 
@@ -47,15 +51,63 @@ contract AdminContract is IAdmin, Ownable{
         return feeOfRaisedFundsPercent;
     }
 
+    function calculateFee(uint256 amount) external view override returns(uint256){
+        return amount * feeOfRaisedFundsPercent / 100;
+    }
+
     function getReceiverFee() external view override returns(address){
         return feeReceiver;
     }
 
-    function getDexRouter() external view override returns(address){
-        return dexRouter;
+    function getDexRouterEnabled(address _dex) external view override returns(bool){
+        return dexList[_dex];
     }
 
     function getOwner() external view override returns(address) {
         return owner();
+    }
+
+    function getGeneralMinInvestment() external view override returns(uint256){
+        return generalMinInvestment;
+    }
+
+    function _checkRouter(address _router) private view returns(bool){
+        address weth;
+        address factory;
+
+        if(_isContract(_router)){
+            try IUniswapV2Router02(_router).factory() returns (address _factory){
+                factory = _factory;
+            } catch {
+                return false;
+            }
+
+            /* try IUniswapV2Factory02(factory).allPairsLength() returns (uint256 _length){
+                if (_length == 0){
+                    return false;
+                }
+            } catch {
+                return false;
+            } */
+
+            try IUniswapV2Router02(_router).WETH() returns (address _weth){
+                weth = _weth;
+            } catch {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+
+        return true;
+    }
+
+    function _isContract(address addr) private view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(addr)
+        }
+        return size > 0;
     }
 }

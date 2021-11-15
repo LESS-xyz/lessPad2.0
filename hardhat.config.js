@@ -25,28 +25,35 @@ module.exports = {
       url: kovanURL,
       chainId: 42,
       gas: 12000000,
-      accounts: {mnemonic: MNEMONIC},
+      accounts: [`0x${MNEMONIC}`],
       saveDeployments: true
     },
     goerli: {
       url: goerliURL,
       chainId: 5,
       gasPrice: 1000,
-      accounts: {mnemonic: MNEMONIC},
+      accounts: [`0x${MNEMONIC}`],
       saveDeployments: true
     },
     rinkeby: {
       url: rinkebyURL,
       chainId: 4,
       gasPrice: "auto",
-      accounts: {mnemonic: MNEMONIC},
+      accounts: [`0x${MNEMONIC}`],
       saveDeployments: true
     },
     mainnet: {
       url: mainnetURL,
       chainId: 1,
       gasPrice: 20000000000,
-      accounts: {mnemonic: MNEMONIC},
+      accounts: [`0x${MNEMONIC}`],
+      saveDeployments: true
+    },
+    bscTestnet: {
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545",
+      chainId: 97,
+      gasPrice: "auto",
+      accounts: [`0x${MNEMONIC}`],
       saveDeployments: true
     }
   },
@@ -59,21 +66,6 @@ module.exports = {
   },
   solidity: {
     compilers: [
-        {
-          version: "0.8.4",
-          settings: {
-            optimizer: {
-              enabled: false,
-              runs: 200,
-            },
-            metadata: {
-              // do not include the metadata hash, since this is machine dependent
-              // and we want all generated code to be deterministic
-              // https://docs.soliditylang.org/en/v0.7.6/metadata.html
-              bytecodeHash: "none",
-            },
-          },
-        },
         {
           version: "0.8.9",
           settings: {},

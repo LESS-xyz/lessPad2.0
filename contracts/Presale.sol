@@ -9,6 +9,8 @@ import "./pancake-swap/libraries/TransferHelper.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+import "hardhat/console.sol";
+
 contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
     IAdmin public immutable adminContract;
     address public immutable factory;
@@ -39,7 +41,8 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
     }
 
     modifier liquidityAdded() {
-        require(intermediate.liquidityAdded, "LIQ");
+        if (certifiedAddition.liquidity)
+            require(intermediate.liquidityAdded, "LIQ");
         _;
     }
 
@@ -92,8 +95,7 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
     function setCertifiedAddition(
         bool _liquidity,
         uint8 _vesting,
-        address[] memory _whitelist,
-        address _nativeToken
+        address[] memory _whitelist
     ) external override onlyFactory {
         uint256 len = _whitelist.length;
         if (len > 0) {
@@ -102,21 +104,17 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
                     whitelist[_whitelist[i]] = true;
             }
         }
-        certifiedAddition = CertifiedAddition(
-            _liquidity,
-            _vesting,
-            _whitelist,
-            _nativeToken
-        );
+        certifiedAddition = CertifiedAddition(_liquidity, _vesting, _whitelist);
     }
 
     function setDexInfo(
+        address dex,
         uint256 price,
         uint256 duration,
         uint8 percent,
         uint256 allocationTime
     ) external override onlyFactory {
-        dexInfo = PresaleDexInfo(price, duration, percent, allocationTime);
+        dexInfo = PresaleDexInfo(dex, price, duration, percent, allocationTime);
     }
 
     function setStringInfo(
@@ -141,17 +139,19 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         );
     }
 
-    function invest(uint256 amount) external payable timing nonReentrant {
+    function invest() external payable timing nonReentrant {
         address sender = _msgSender();
+        uint256 amount = msg.value;
         Investment storage investment = investments[sender];
         if (certifiedAddition.whitelist.length > 0) {
             require(whitelist[sender], "NOT ACCESS");
         }
-        //TODO: min/max check
-        amount = certifiedAddition.nativeToken == address(0)
-            ? msg.value
-            : amount;
-        require(amount > 0, "ZERO");
+        require(
+            amount + investment.amountEth >= generalInfo.minInvestment &&
+                amount + investment.amountEth <= generalInfo.maxInvestment &&
+                amount > 0,
+            "MIN/MAX INVESTMENT"
+        );
 
         uint256 reservedTokens = getTokenAmount(amount);
 
@@ -169,20 +169,19 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         investment.amountEth += amount;
         investment.amountTokens += reservedTokens;
         intermediate.tokensForSaleLeft -= reservedTokens;
-
-        if (address(certifiedAddition.nativeToken) != address(0))
-            TransferHelper.safeTransferFrom(
-                certifiedAddition.nativeToken,
-                sender,
-                address(this),
-                amount
-            );
     }
 
-    function withdrawInvestment(uint256 amount) external timing nonReentrant {
+    function withdrawInvestment(uint256 amount) external nonReentrant {
         address sender = _msgSender();
         Investment storage investment = investments[sender];
-        require(investment.amountEth >= amount && amount > 0, "N.E.");
+        require(
+            investment.amountEth >= amount &&
+                amount > 0 &&
+                (investment.amountEth - amount >= generalInfo.minInvestment ||
+                    investment.amountEth == amount),
+            "N.E."
+        );
+        require(generalInfo.openTime < block.timestamp, "TIME");
         require(
             intermediate.raisedAmount < generalInfo.softCapInWei &&
                 !intermediate.liquidityAdded,
@@ -197,15 +196,7 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
             intermediate.participants--;
         }
 
-        if (certifiedAddition.nativeToken == address(0)) {
-            payable(sender).transfer(amount);
-        } else {
-            TransferHelper.safeTransfer(
-                certifiedAddition.nativeToken,
-                sender,
-                amount
-            );
-        }
+        TransferHelper.safeTransferETH(sender, amount);
     }
 
     function addLiquidity() external nonReentrant {
@@ -223,42 +214,32 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
             block.timestamp +
             (dexInfo.lpTokensLockDurationInDays * 1 days);
 
-        IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(
-            address(adminContract.getDexRouter())
-        );
+        IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(dexInfo.dex);
 
         uint256 liqPoolEthAmount = (intermediate.raisedAmount *
             dexInfo.liquidityPercentageAllocation) / 100;
-
-        if (certifiedAddition.nativeToken != address(0)) {
-            TransferHelper.safeApprove(
-                certifiedAddition.nativeToken,
-                address(uniswapRouter),
-                liqPoolEthAmount
-            );
-            liqPoolEthAmount = swapToEth(liqPoolEthAmount);
-        }
 
         uint256 liqPoolTokenAmount = (liqPoolEthAmount * tokenMagnitude) /
             dexInfo.listingPriceInWei;
 
         require(
-            intermediate.tokensForLiquidityLeft >= liqPoolTokenAmount,
+            intermediate.tokensForLiquidityLeft >= liqPoolTokenAmount &&
+                address(this).balance >= liqPoolEthAmount,
             "N.E."
         );
 
         intermediate.tokensForLiquidityLeft -= liqPoolTokenAmount;
 
-        IERC20 token = IERC20(generalInfo.tokenAddress);
+        TransferHelper.safeApprove(
+            address(generalInfo.tokenAddress),
+            address(uniswapRouter),
+            liqPoolTokenAmount
+        );
 
-        TransferHelper.safeApprove(address(token), address(uniswapRouter), liqPoolTokenAmount);
-
-        uint256 amountEth;
-
-        (, amountEth, intermediate.lpAmount) = uniswapRouter.addLiquidityETH{
+        (, , intermediate.lpAmount) = uniswapRouter.addLiquidityETH{
             value: liqPoolEthAmount
         }(
-            address(token),
+            address(generalInfo.tokenAddress),
             liqPoolTokenAmount,
             0,
             0,
@@ -275,47 +256,49 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         );
     }
 
-    function claimTokens()
-        external
-        nonReentrant
-        liquidityAdded
-    {
+    function claimTokens() external nonReentrant liquidityAdded {
         address sender = _msgSender();
         Investment storage investment = investments[sender];
         require(
             block.timestamp >= generalInfo.closeTime &&
-                investment.amountClaimed <
-                investment.amountTokens &&
+                investment.amountClaimed < investment.amountTokens &&
                 investment.amountEth > 0,
             "W"
         );
         if (certifiedAddition.vesting == 0) {
-            investment.amountClaimed = investment
-                .amountTokens; // make sure this goes first before transfer to prevent reentrancy
-            TransferHelper.safeTransfer(generalInfo.tokenAddress, sender, investment.amountTokens);
+            investment.amountClaimed = investment.amountTokens; // make sure this goes first before transfer to prevent reentrancy
+            TransferHelper.safeTransfer(
+                generalInfo.tokenAddress,
+                sender,
+                investment.amountTokens
+            );
         } else {
-            uint256 beginingTime = certifiedAddition.liquidity ? intermediate.lpUnlockTime - dexInfo.lpTokensLockDurationInDays * 1 days : generalInfo.closeTime;
+            uint256 beginingTime = certifiedAddition.liquidity
+                ? intermediate.lpUnlockTime -
+                    dexInfo.lpTokensLockDurationInDays *
+                    1 days
+                : generalInfo.closeTime;
             uint256 numOfParts = (block.timestamp - beginingTime) / 2592000; //ONE MONTH
             uint256 part = (investment.amountTokens *
                 certifiedAddition.vesting) / 100;
-            uint256 earnedTokens = numOfParts *
-                part -
-                investment.amountClaimed;
+            uint256 earnedTokens = numOfParts * part - investment.amountClaimed;
             require(earnedTokens > 0, "0");
             if (
                 earnedTokens <=
-                investment.amountTokens -
-                    investment.amountClaimed
+                investment.amountTokens - investment.amountClaimed
             ) {
                 investment.amountClaimed += earnedTokens;
             } else {
                 earnedTokens =
                     investment.amountTokens -
                     investment.amountClaimed;
-                investment.amountClaimed = investment
-                    .amountTokens;
+                investment.amountClaimed = investment.amountTokens;
             }
-            TransferHelper.safeTransfer(generalInfo.tokenAddress, sender, earnedTokens);
+            TransferHelper.safeTransfer(
+                generalInfo.tokenAddress,
+                sender,
+                earnedTokens
+            );
         }
     }
 
@@ -332,20 +315,13 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
             "OTS"
         );
         intermediate.withdrawedFunds = true;
-        uint256 collectedBalance;
-        if (address(0) == certifiedAddition.nativeToken) {
-            collectedBalance = address(this).balance;
-            payable(intermediate.creator).transfer(collectedBalance);
-        } else {
-            collectedBalance = IERC20(certifiedAddition.nativeToken).balanceOf(
-                address(this)
-            );
-            TransferHelper.safeTransfer(
-                certifiedAddition.nativeToken,
-                intermediate.creator,
-                collectedBalance
-            );
-        }
+        uint256 fee = adminContract.calculateFee(intermediate.raisedAmount);
+        TransferHelper.safeTransferETH(adminContract.getReceiverFee(), fee);
+        TransferHelper.safeTransferETH(
+            intermediate.creator,
+            address(this).balance
+        );
+
         uint256 unsoldTokensAmount = intermediate.tokensForSaleLeft +
             intermediate.tokensForLiquidityLeft;
         if (unsoldTokensAmount > 0) {
@@ -386,23 +362,5 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         returns (uint256)
     {
         return (_weiAmount * tokenMagnitude) / generalInfo.tokenPriceInWei;
-    }
-
-    function swapToEth(uint256 liqPoolEthAmount) private returns(uint256){
-        IUniswapV2Router02 uniswap = IUniswapV2Router02(
-            adminContract.getDexRouter()
-        );
-        address[] memory path = new address[](2);
-        path[0] = certifiedAddition.nativeToken;
-        path[1] = uniswap.WETH();
-        uint256[] memory amount = uniswap.getAmountsOut(liqPoolEthAmount, path);
-        amount = uniswap.swapTokensForExactETH(
-            amount[1],
-            liqPoolEthAmount,
-            path,
-            address(this),
-            block.timestamp
-        );
-        return amount[1];
     }
 }

@@ -10,11 +10,11 @@ interface IPresale {
     function setCertifiedAddition(
         bool _liquidity,
         uint8 _vesting,
-        address[] memory _whitelist,
-        address _nativeToken
+        address[] memory _whitelist
     ) external;
 
     function setDexInfo(
+        address dex,
         uint256 price,
         uint256 duration,
         uint8 percent,

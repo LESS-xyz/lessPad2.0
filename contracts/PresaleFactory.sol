@@ -9,6 +9,8 @@ import "./pancake-swap/libraries/TransferHelper.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+import "hardhat/console.sol";
+
 contract PresaleFactory is IStructs, Context {
     IAdmin public immutable adminContract;
     address public presaleMaster;
@@ -23,7 +25,7 @@ contract PresaleFactory is IStructs, Context {
     );
     event Received(address indexed from, uint256 amount);
 
-    constructor(address _adminContract){
+    constructor(address _adminContract) {
         adminContract = IAdmin(_adminContract);
     }
 
@@ -43,7 +45,8 @@ contract PresaleFactory is IStructs, Context {
         PresaleStringInfo calldata _stringInfo,
         CertifiedAddition calldata _addition
     ) external payable returns (uint256 presaleId) {
-        
+        require(presaleMaster != address(0), "NOT INITIALIZED");
+
         require(
             _info.openTime > block.timestamp &&
                 _info.closeTime - _info.openTime > 0 &&
@@ -54,22 +57,29 @@ contract PresaleFactory is IStructs, Context {
         require(
             _info.tokenPriceInWei > 0 &&
                 _info.softCapInWei > 0 &&
-                _info.hardCapInWei > 0 &&
                 _info.hardCapInWei >= _info.softCapInWei &&
                 _info.maxInvestment >= _info.minInvestment &&
+                _info.minInvestment >=
+                adminContract.getGeneralMinInvestment() &&
+                _info.hardCapInWei >= _info.minInvestment &&
                 _info.tokenAddress != address(0) &&
                 msg.value == adminContract.getCreationFee(),
             "WRONG PARAMS"
         );
-        
-        if(_addition.liquidity){
-            require(_dexInfo.listingPriceInWei > 0 &&
-                _dexInfo.liquidityPercentageAllocation > 49 &&
-                _dexInfo.liquidityPercentageAllocation < 101 &&
-                _dexInfo.lpTokensLockDurationInDays > 29,
+
+        if (_addition.liquidity) {
+            require(
+                _dexInfo.listingPriceInWei > 0 &&
+                    _dexInfo.liquidityPercentageAllocation > 49 &&
+                    _dexInfo.liquidityPercentageAllocation < 101 &&
+                    _dexInfo.lpTokensLockDurationInDays > 29 &&
+                    adminContract.getDexRouterEnabled(_dexInfo.dex),
                 "LIQ"
             );
         }
+
+        if(_addition.vesting!=0)
+            require(_addition.vesting < 101, "VESTING");
 
         // maxLiqPoolTokenAmount, maxTokensToBeSold, requiredTokenAmount
         uint256[] memory tokenAmounts = new uint256[](3);
@@ -79,11 +89,13 @@ contract PresaleFactory is IStructs, Context {
             _dexInfo.listingPriceInWei,
             _dexInfo.liquidityPercentageAllocation,
             IERC20Metadata(_info.tokenAddress).decimals(),
-            (address(_addition.nativeToken) == address(0)) ? 18 : IERC20Metadata(_addition.nativeToken).decimals()
+            18
         );
 
+        //console.log("SUM: ",tokenAmounts[2]);
+
         address presaleAddress = Clones.clone(presaleMaster);
-        //Presale presale = Presale(presaleAddress);
+
         initializePresaleCertified(
             IPresale(presaleAddress),
             [tokenAmounts[1], tokenAmounts[0]],
@@ -94,11 +106,24 @@ contract PresaleFactory is IStructs, Context {
         );
         presaleId = presales.length;
         presales.push(presaleAddress);
-        
-        TransferHelper.safeTransferFrom(_info.tokenAddress, _msgSender(), presaleAddress, tokenAmounts[2]);
-        TransferHelper.safeTransferETH(adminContract.getReceiverFee(), msg.value);
 
-        emit PresaleCreated(presaleId, _msgSender(), presaleAddress, _info.tokenAddress);
+        TransferHelper.safeTransferFrom(
+            _info.tokenAddress,
+            _msgSender(),
+            presaleAddress,
+            tokenAmounts[2]
+        );
+        TransferHelper.safeTransferETH(
+            adminContract.getReceiverFee(),
+            msg.value
+        );
+
+        emit PresaleCreated(
+            presaleId,
+            _msgSender(),
+            presaleAddress,
+            _info.tokenAddress
+        );
     }
 
     function initializePresaleCertified(
@@ -127,12 +152,12 @@ contract PresaleFactory is IStructs, Context {
         _presale.setCertifiedAddition(
             _addition.liquidity,
             _addition.vesting,
-            _addition.whitelist,
-            _addition.nativeToken
+            _addition.whitelist
         );
 
         if (_addition.liquidity) {
             _presale.setDexInfo(
+                _dexInfo.dex,
                 _dexInfo.listingPriceInWei,
                 _dexInfo.lpTokensLockDurationInDays,
                 _dexInfo.liquidityPercentageAllocation,

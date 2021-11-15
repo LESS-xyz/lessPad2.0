@@ -46,4 +46,6 @@ interface IUniswapV2Factory02 {
         external
         view
         returns (address pair);
+
+    function allPairsLength() external view returns (uint);
 }

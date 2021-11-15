@@ -3,10 +3,12 @@
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.5.1",
-    "hardhat": "^2.6.8"
+    "hardhat": "^2.6.8",
+    "web3": "^1.6.0"
   },
   "description": "This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.",
   "version": "1.0.0",
@@ -16,9 +18,10 @@
   },
   "dependencies": {
     "@nomiclabs/hardhat-etherscan": "^2.1.7",
-    "@nomiclabs/hardhat-web3": "^2.0.0",
     "@openzeppelin/contracts": "^4.3.2",
     "@openzeppelin/hardhat-upgrades": "^1.12.0",
+    "@openzeppelin/test-helpers": "^0.5.15",
+    "chai-bignumber": "^3.0.0",
     "hardhat-deploy": "^0.9.6",
     "hardhat-docgen": "^1.2.0",
     "hardhat-gas-reporter": "^1.0.4",

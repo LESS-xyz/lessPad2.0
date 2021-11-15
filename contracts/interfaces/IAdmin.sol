@@ -8,7 +8,11 @@ interface IAdmin {
 
     function getReceiverFee() external view returns(address);
 
-    function getDexRouter() external view returns(address);
+    function getDexRouterEnabled(address _dex) external view returns(bool);
 
     function getOwner() external view returns(address);
+
+    function getGeneralMinInvestment() external view returns(uint256);
+
+    function calculateFee(uint256 amount) external view returns(uint256);
 }

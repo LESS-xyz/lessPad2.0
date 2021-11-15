@@ -15,6 +15,7 @@ interface IStructs {
     }
 
     struct PresaleDexInfo {
+        address dex;
         uint256 listingPriceInWei;
         uint256 lpTokensLockDurationInDays;
         uint8 liquidityPercentageAllocation;
@@ -36,7 +37,6 @@ interface IStructs {
         bool liquidity;
         uint8 vesting;
         address[] whitelist;
-        address nativeToken;
     }
 
     struct IntermediateVariables {
