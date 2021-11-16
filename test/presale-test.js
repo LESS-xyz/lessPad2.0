@@ -366,6 +366,248 @@ describe("Presale", function() {
         expect(balanceAfter.sub(balanceBefore)).to.be.equal(contractIntermediate.lpAmount);
         await expectRevert(presaleInst.connect(user1).refundLpTokens(), "EARLY");
     })
+
+    it("Withdraw investments (all/more than allowed); presale without vesting and whitelist", async()=>{
+        const TestToken = await ethers.getContractFactory("TestToken");
+        let testToken1 = await TestToken.connect(user2).deploy("Test Token 1", "TEST1");
+        await testToken1.deployed();
+        await testToken1.connect(user2).approve(factory.address, ethers.utils.parseEther('1000'));
+
+        let nowTimestamp = await time.latest();
+        let info = {
+            tokenAddress: testToken1.address,
+            tokenPriceInWei: ONE_TOKEN.div(ONE_HUNDRED),
+            hardCapInWei: TEN.mul(ONE_TOKEN),
+            softCapInWei: FIVE.mul(ONE_TOKEN),
+            openTime: BigNumber.from(nowTimestamp.add(time.duration.days(1)).toString()),
+            closeTime: BigNumber.from(nowTimestamp.add(time.duration.days(2)).toString()),
+            minInvestment: ONE_TOKEN.div(TEN),
+            maxInvestment: ONE_TOKEN.mul(TEN)
+        }
+        console.log(info);
+        let dexInfo = {
+            dex : pancakeRouterInstant.address,
+            listingPriceInWei: ONE_TOKEN.mul(TWO).div(ONE_HUNDRED),
+            lpTokensLockDurationInDays: TEN.mul(THREE),
+            liquidityPercentageAllocation: TEN.mul(FIVE),
+            liquidityAllocationTime: BigNumber.from(nowTimestamp.add(time.duration.days(3)).toString())
+        }
+        console.log(dexInfo);
+        let certInfo = {
+            liquidity: false,
+            vesting: ZERO,
+            whitelist: []
+        }
+        console.log(certInfo);
+        let name = "Test Presale";
+        let stringInfo = {
+            saleTitle: ethers.utils.formatBytes32String(name),
+            linkTelegram: ethers.utils.formatBytes32String("https://t.me/TestPresale"),
+            linkGithub: ethers.utils.formatBytes32String("https://github.com/TestPresale"),
+            linkTwitter: ethers.utils.formatBytes32String("https://twitter.com/TestPresale"),
+            linkWebsite: ethers.utils.formatBytes32String("https://website.com/TestPresale"),
+            linkLogo: "https://cdn.logo.com/hotlink-ok/logo-social.png",
+            description: "Test Presale description",
+            whitepaper: "https://uniswap.org/whitepaper.pdf"
+        }
+        console.log(stringInfo);
+
+        await factory.connect(user2).createPresale(info, dexInfo, stringInfo, certInfo, {value: ONE_TOKEN});
+
+        const presaleAddress = await factory.presales(ONE);
+        const Presale = await ethers.getContractFactory("Presale");
+        const presaleInst = Presale.attach(presaleAddress);
+
+        await expectRevert(presaleInst.connect(user2).invest({value: ONE}), "TIME");
+
+        await time.increase(time.duration.days(1));
+
+        await expectRevert(presaleInst.connect(user2).invest({value: ONE}), "FORBIDDEN");
+        await presaleInst.connect(user1).invest({value: ONE_TOKEN});
+        await expectRevert(presaleInst.connect(user1).withdrawInvestment(ethers.utils.parseEther('0.98')), "N.E.");
+        
+        let contractIntermediate = await presaleInst.intermediate.call();
+        expect(contractIntermediate.participants).to.be.equal(ONE);
+        let investment = await presaleInst.investments(user1.address);
+        expect(investment.amountTokens).to.be.equal(ONE_HUNDRED.mul(ONE_TOKEN));
+
+        await presaleInst.connect(user1).withdrawInvestment(ONE_TOKEN);
+        contractIntermediate = await presaleInst.intermediate.call();
+        expect(contractIntermediate.participants).to.be.equal(ZERO);
+        investment = await presaleInst.investments(user1.address);
+        expect(investment.amountTokens).to.be.equal(ZERO);
+
+        await presaleInst.connect(user1).invest({value: FIVE.mul(ONE_TOKEN)});
+        await presaleInst.connect(user3).invest({value: TWO.mul(ONE_TOKEN)});
+
+        const balanceBefore1 = await testToken1.balanceOf(user1.address);
+        const balanceBefore3 = await testToken1.balanceOf(user3.address);
+
+        await time.increase(time.duration.days(1));
+
+        await presaleInst.connect(user1).claimTokens();
+        await presaleInst.connect(user3).claimTokens();
+
+        const balanceAfter1 = await testToken1.balanceOf(user1.address);
+        const balanceAfter3 = await testToken1.balanceOf(user3.address);
+
+        expect(balanceAfter1.sub(balanceBefore1)).to.be.equal(ethers.utils.parseEther('500'));
+        expect(balanceAfter3.sub(balanceBefore3)).to.be.equal(ethers.utils.parseEther('200'));
+    })
+
+    it("Unsuccessful presale ending", async()=>{
+      const TestToken = await ethers.getContractFactory("TestToken");
+      let testToken2 = await TestToken.connect(deployer).deploy("Test Token 2", "TEST2");
+      await testToken2.deployed();
+      await testToken2.connect(deployer).approve(factory.address, ethers.utils.parseEther('1250'));
+
+      let nowTimestamp = await time.latest();
+      let info = {
+          tokenAddress: testToken2.address,
+          tokenPriceInWei: ONE_TOKEN.div(ONE_HUNDRED),
+          hardCapInWei: TEN.mul(ONE_TOKEN),
+          softCapInWei: FIVE.mul(ONE_TOKEN),
+          openTime: BigNumber.from(nowTimestamp.add(time.duration.days(1)).toString()),
+          closeTime: BigNumber.from(nowTimestamp.add(time.duration.days(2)).toString()),
+          minInvestment: ONE_TOKEN.div(TEN),
+          maxInvestment: ONE_TOKEN.mul(TEN)
+      }
+      console.log(info);
+      let dexInfo = {
+          dex : pancakeRouterInstant.address,
+          listingPriceInWei: ONE_TOKEN.mul(TWO).div(ONE_HUNDRED),
+          lpTokensLockDurationInDays: TEN.mul(THREE),
+          liquidityPercentageAllocation: TEN.mul(FIVE),
+          liquidityAllocationTime: BigNumber.from(nowTimestamp.add(time.duration.days(3)).toString())
+      }
+      console.log(dexInfo);
+      let certInfo = {
+          liquidity: true,
+          vesting: ZERO,
+          whitelist: []
+      }
+      console.log(certInfo);
+      let name = "Test Presale";
+      let stringInfo = {
+          saleTitle: ethers.utils.formatBytes32String(name),
+          linkTelegram: ethers.utils.formatBytes32String("https://t.me/TestPresale"),
+          linkGithub: ethers.utils.formatBytes32String("https://github.com/TestPresale"),
+          linkTwitter: ethers.utils.formatBytes32String("https://twitter.com/TestPresale"),
+          linkWebsite: ethers.utils.formatBytes32String("https://website.com/TestPresale"),
+          linkLogo: "https://cdn.logo.com/hotlink-ok/logo-social.png",
+          description: "Test Presale description",
+          whitepaper: "https://uniswap.org/whitepaper.pdf"
+      }
+      console.log(stringInfo);
+
+      await factory.connect(deployer).createPresale(info, dexInfo, stringInfo, certInfo, {value: ONE_TOKEN});
+
+      const presaleAddress = await factory.presales(TWO);
+      const Presale = await ethers.getContractFactory("Presale");
+      const presaleInst = Presale.attach(presaleAddress);
+
+      await time.increase(time.duration.days(1));
+
+      await presaleInst.connect(user1).invest({value: ethers.utils.parseEther('3.7')});
+      await presaleInst.connect(user2).invest({value: ethers.utils.parseEther('1.2')});
+
+      await presaleInst.connect(user1).withdrawInvestment(ethers.utils.parseEther('0.1'));
+
+      expect(await provider.getBalance(presaleInst.address)).to.be.equal(ethers.utils.parseEther('4.8'));
+
+      await time.increase(time.duration.days(2));
+
+      await expectRevert(presaleInst.connect(deployer).addLiquidity(), "WRONG PARAMS");
+      await expectRevert(presaleInst.connect(deployer).collectFundsRaised(), "LIQ");
+      await expectRevert(presaleInst.connect(deployer).refundLpTokens(), "LIQ");
+
+      await expectRevert(presaleInst.connect(user3).withdrawInvestment(ONE), "N.E.");
+      
+      await expectRevert(presaleInst.connect(user1).withdrawInvestment(ethers.utils.parseEther('3.55')), "N.E.");
+      await presaleInst.connect(user1).withdrawInvestment(ethers.utils.parseEther('3.5'));
+      await presaleInst.connect(user1).withdrawInvestment(ethers.utils.parseEther('0.1'));
+      await presaleInst.connect(user2).withdrawInvestment(ethers.utils.parseEther('1.2'));
+    })
+
+    it("Vesting, borrow tkns too late and strange vesting perc", async()=>{
+      const TestToken = await ethers.getContractFactory("TestToken");
+      let testToken3 = await TestToken.connect(deployer).deploy("Test Token 3", "TEST2");
+      await testToken3.deployed();
+      await testToken3.connect(deployer).approve(factory.address, ethers.utils.parseEther('1250'));
+
+      let nowTimestamp = await time.latest();
+      let info = {
+          tokenAddress: testToken3.address,
+          tokenPriceInWei: ONE_TOKEN.div(ONE_HUNDRED),
+          hardCapInWei: TEN.mul(ONE_TOKEN),
+          softCapInWei: FIVE.mul(ONE_TOKEN),
+          openTime: BigNumber.from(nowTimestamp.add(time.duration.days(1)).toString()),
+          closeTime: BigNumber.from(nowTimestamp.add(time.duration.days(2)).toString()),
+          minInvestment: ONE_TOKEN.div(TEN),
+          maxInvestment: ONE_TOKEN.mul(TEN)
+      }
+      console.log(info);
+      let dexInfo = {
+          dex : pancakeRouterInstant.address,
+          listingPriceInWei: ONE_TOKEN.mul(TWO).div(ONE_HUNDRED),
+          lpTokensLockDurationInDays: TEN.mul(THREE),
+          liquidityPercentageAllocation: TEN.mul(FIVE),
+          liquidityAllocationTime: BigNumber.from(nowTimestamp.add(time.duration.days(3)).toString())
+      }
+      console.log(dexInfo);
+      let certInfo = {
+          liquidity: false,
+          vesting: SIX.mul(TEN),
+          whitelist: []
+      }
+      console.log(certInfo);
+      let name = "Test Presale";
+      let stringInfo = {
+          saleTitle: ethers.utils.formatBytes32String(name),
+          linkTelegram: ethers.utils.formatBytes32String("https://t.me/TestPresale"),
+          linkGithub: ethers.utils.formatBytes32String("https://github.com/TestPresale"),
+          linkTwitter: ethers.utils.formatBytes32String("https://twitter.com/TestPresale"),
+          linkWebsite: ethers.utils.formatBytes32String("https://website.com/TestPresale"),
+          linkLogo: "https://cdn.logo.com/hotlink-ok/logo-social.png",
+          description: "Test Presale description",
+          whitepaper: "https://uniswap.org/whitepaper.pdf"
+      }
+      console.log(stringInfo);
+
+      await factory.connect(deployer).createPresale(info, dexInfo, stringInfo, certInfo, {value: ONE_TOKEN});
+
+      const presaleAddress = await factory.presales(THREE);
+      const Presale = await ethers.getContractFactory("Presale");
+      const presaleInst = Presale.attach(presaleAddress);
+
+      await time.increase(time.duration.days(1));
+      
+      await presaleInst.connect(user1).invest({value: ONE_TOKEN});
+      await presaleInst.connect(user2).invest({value: ONE_TOKEN.mul(FIVE)});
+
+      await time.increase(time.duration.days(1));
+
+      await expectRevert(presaleInst.connect(user1).claimTokens(), "0");
+
+      await time.increase(time.duration.days(30));
+
+      let balanceBefore1 = await testToken3.balanceOf(user1.address);
+      await presaleInst.connect(user1).claimTokens();
+      let balanceAfter1 = await testToken3.balanceOf(user1.address);
+      expect(balanceAfter1.sub(balanceBefore1)).to.be.equal(ethers.utils.parseEther('60'));
+
+      await time.increase(time.duration.days(30));
+
+      balanceBefore1 = await testToken3.balanceOf(user2.address);
+      await presaleInst.connect(user2).claimTokens();
+      balanceAfter1 = await testToken3.balanceOf(user2.address);
+      expect(balanceAfter1.sub(balanceBefore1)).to.be.equal(ethers.utils.parseEther('500'));
+
+      balanceBefore1 = await testToken3.balanceOf(user1.address);
+      await presaleInst.connect(user1).claimTokens();
+      balanceAfter1 = await testToken3.balanceOf(user1.address);
+      expect(balanceAfter1.sub(balanceBefore1)).to.be.equal(ethers.utils.parseEther('40'));
+    })
 });
 
 // Замыкание

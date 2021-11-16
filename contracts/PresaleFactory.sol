@@ -23,15 +23,16 @@ contract PresaleFactory is IStructs, Context {
         address presaleAddress,
         address tokenAddress
     );
-    event Received(address indexed from, uint256 amount);
+
+    /* event Received(address indexed from, uint256 amount); */
 
     constructor(address _adminContract) {
         adminContract = IAdmin(_adminContract);
     }
 
-    receive() external payable {
+    /* receive() external payable {
         emit Received(_msgSender(), msg.value);
-    }
+    } */
 
     function setPresaleMaster(address _presaleMaster) external {
         require(presaleMaster == address(0));
@@ -78,8 +79,7 @@ contract PresaleFactory is IStructs, Context {
             );
         }
 
-        if(_addition.vesting!=0)
-            require(_addition.vesting < 101, "VESTING");
+        if (_addition.vesting != 0) require(_addition.vesting < 101, "VESTING");
 
         // maxLiqPoolTokenAmount, maxTokensToBeSold, requiredTokenAmount
         uint256[] memory tokenAmounts = new uint256[](3);
@@ -92,7 +92,10 @@ contract PresaleFactory is IStructs, Context {
             18
         );
 
-        //console.log("SUM: ",tokenAmounts[2]);
+        if(!_addition.liquidity){
+            tokenAmounts[2] -= tokenAmounts[0];
+            tokenAmounts[0] = 0;
+        }
 
         address presaleAddress = Clones.clone(presaleMaster);
 

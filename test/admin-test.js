@@ -60,4 +60,13 @@ describe("AdminContract", function() {
         expect(await adminContract.getGeneralMinInvestment()).to.be.equal(ONE_TOKEN.div(TEN));
 
     })
+
+    it("Try to add wring dex address", async()=>{
+        const AdminContract = await ethers.getContractFactory("AdminContract");
+        const adminContract = await AdminContract.deploy(deployer.address);
+        await adminContract.deployed();
+
+        await expectRevert(adminContract.addOrRemoveDex(deployer.address, true), "INVALID DEX ADDRESS");
+        await expectRevert(adminContract.addOrRemoveDex(adminContract.address, true), "INVALID DEX ADDRESS");
+    })
 });

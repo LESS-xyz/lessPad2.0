@@ -6,8 +6,10 @@ import "./interfaces/IAdmin.sol";
 import "./interfaces/IStructs.sol";
 import "./interfaces/IPresale.sol";
 import "./pancake-swap/libraries/TransferHelper.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import "hardhat/console.sol";
 
@@ -146,6 +148,9 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         if (certifiedAddition.whitelist.length > 0) {
             require(whitelist[sender], "NOT ACCESS");
         }
+        else
+            require(sender != intermediate.creator, "FORBIDDEN");
+        
         require(
             amount + investment.amountEth >= generalInfo.minInvestment &&
                 amount + investment.amountEth <= generalInfo.maxInvestment &&
@@ -262,7 +267,8 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         require(
             block.timestamp >= generalInfo.closeTime &&
                 investment.amountClaimed < investment.amountTokens &&
-                investment.amountEth > 0,
+                investment.amountEth > 0 &&
+                intermediate.raisedAmount >= generalInfo.softCapInWei,
             "W"
         );
         if (certifiedAddition.vesting == 0) {
