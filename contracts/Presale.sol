@@ -141,6 +141,8 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         );
     }
 
+    /** @dev Invest payable function to invest BNB and reserve presale tokens
+     */
     function invest() external payable timing nonReentrant {
         address sender = _msgSender();
         uint256 amount = msg.value;
@@ -176,6 +178,10 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         intermediate.tokensForSaleLeft -= reservedTokens;
     }
 
+    /** @dev Withdraw investment tokens to withdraw your BNB
+     * @notice You're available to withdraw all your investment. But if it's partially withdraw, minimum investment amount exactly will stay al contract
+     * @param amount BNB amount to withdraw
+     */
     function withdrawInvestment(uint256 amount) external nonReentrant {
         address sender = _msgSender();
         Investment storage investment = investments[sender];
@@ -204,6 +210,8 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         TransferHelper.safeTransferETH(sender, amount);
     }
 
+    /** @dev Add liquidity owner's function
+     */
     function addLiquidity() external nonReentrant {
         require(
             block.timestamp >= dexInfo.liquidityAllocationTime &&
@@ -261,6 +269,9 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         );
     }
 
+    /** @dev Function for claiming tokens in proportion to investments
+     * @notice Vesting implemented here (if certifiedAddition.vesting != 0)
+     */
     function claimTokens() external nonReentrant liquidityAdded {
         address sender = _msgSender();
         Investment storage investment = investments[sender];
@@ -308,6 +319,8 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         }
     }
 
+    /** @dev Owner's function to claim all earned funds and send 2% fee
+     */
     function collectFundsRaised()
         external
         nonReentrant
@@ -341,6 +354,8 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         }
     }
 
+    /** @dev Owner's function for LP-tokens claiming after lock time
+     */
     function refundLpTokens()
         external
         nonReentrant

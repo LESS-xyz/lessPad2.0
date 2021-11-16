@@ -40,6 +40,12 @@ contract PresaleFactory is IStructs, Context {
         presaleMaster = _presaleMaster;
     }
 
+    /** @dev Function for creating presales
+     * @param _info general info of presale; watch PresaleInfo struct
+     * @param _dexInfo DEX related presale's information; watch PresaleDexInfo struct
+     * @param _stringInfo presale's describing, links, etc.; watch PresaleStringInfo struct
+     * @param _addition addition presale's information; watch CertifiedAddition struct
+     */
     function createPresale(
         PresaleInfo calldata _info,
         PresaleDexInfo calldata _dexInfo,
