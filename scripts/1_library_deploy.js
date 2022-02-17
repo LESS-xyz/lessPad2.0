@@ -6,7 +6,13 @@
 const hre = require("hardhat");
 
 require('dotenv').config();
-const{FEE_RECEIVER, PANCAKE_SWAP_ROUTER, APE_SWAP_ROUTER, BI_SWAP_ROUTER}=process.env;
+const{
+  FEE_RECEIVER, 
+  PANCAKE_SWAP_ROUTER, 
+  APE_SWAP_ROUTER, 
+  BI_SWAP_ROUTER,
+  BSC_ROUTER_TEST
+}=process.env;
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -21,9 +27,10 @@ async function main() {
   const adminContract = await AdminContract.deploy(FEE_RECEIVER);
 
   await adminContract.deployed();
-  await adminContract.addOrRemoveDex(PANCAKE_SWAP_ROUTER, true);
+  /* await adminContract.addOrRemoveDex(PANCAKE_SWAP_ROUTER, true);
   await adminContract.addOrRemoveDex(APE_SWAP_ROUTER, true);
-  await adminContract.addOrRemoveDex(BI_SWAP_ROUTER, true);
+  await adminContract.addOrRemoveDex(BI_SWAP_ROUTER, true); */
+  await adminContract.addOrRemoveDex(BSC_ROUTER_TEST, true);
 
   console.log("AdminContract deployed to:", adminContract.address);
 }

@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import "hardhat/console.sol";
+//import "hardhat/console.sol";
 
 contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
     IAdmin public immutable adminContract;
@@ -149,10 +149,8 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
         Investment storage investment = investments[sender];
         if (certifiedAddition.whitelist.length > 0) {
             require(whitelist[sender], "NOT ACCESS");
-        }
-        else
-            require(sender != intermediate.creator, "FORBIDDEN");
-        
+        } else require(sender != intermediate.creator, "FORBIDDEN");
+
         require(
             amount + investment.amountEth >= generalInfo.minInvestment &&
                 amount + investment.amountEth <= generalInfo.maxInvestment &&
@@ -212,20 +210,19 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
 
     /** @dev Add liquidity owner's function
      */
-    function addLiquidity() external nonReentrant {
+    function addLiquidity() external nonReentrant onlyPresaleCreator {
         require(
             block.timestamp >= dexInfo.liquidityAllocationTime &&
                 certifiedAddition.liquidity &&
                 intermediate.raisedAmount >= generalInfo.softCapInWei &&
-                !intermediate.liquidityAdded &&
-                _msgSender() == intermediate.creator,
+                !intermediate.liquidityAdded,
             "WRONG PARAMS"
         );
 
         intermediate.liquidityAdded = true;
         intermediate.lpUnlockTime =
             block.timestamp +
-            (dexInfo.lpTokensLockDurationInDays * 1 days);
+            (dexInfo.lpTokensLockDurationInDays * 1 days); //PROD: 1 days
 
         IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(dexInfo.dex);
 
@@ -293,9 +290,9 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
             uint256 beginingTime = certifiedAddition.liquidity
                 ? intermediate.lpUnlockTime -
                     dexInfo.lpTokensLockDurationInDays *
-                    1 days
+                    1 days //PROD: 1 days
                 : generalInfo.closeTime;
-            uint256 numOfParts = (block.timestamp - beginingTime) / 2592000; //ONE MONTH
+            uint256 numOfParts = (block.timestamp - beginingTime) / 2592000; //PROD: 2592000 ONE MONTH
             uint256 part = (investment.amountTokens *
                 certifiedAddition.vesting) / 100;
             uint256 earnedTokens = numOfParts * part - investment.amountClaimed;
@@ -375,6 +372,29 @@ contract Presale is Context, IPresale, IStructs, ReentrancyGuard {
             "LP.T"
         );
         intermediate.lpAmount = 0;
+    }
+
+    /**@dev Creator func to withdraw presale tokens when presale failed
+     */
+    function badOutcome() external nonReentrant onlyPresaleCreator {
+        require(
+            block.timestamp > generalInfo.closeTime &&
+                intermediate.raisedAmount < generalInfo.softCapInWei,
+            "Wrong params"
+        );
+        TransferHelper.safeTransfer(
+            generalInfo.tokenAddress,
+            intermediate.creator,
+            IERC20(generalInfo.tokenAddress).balanceOf(address(this))
+        );
+    }
+
+    /** @dev Function to get whitelist addresses array and bool isPrivate?
+     */
+    function getWhitelist() external view returns (bool, address[] memory) {
+        if (certifiedAddition.whitelist.length > 0)
+            return (true, certifiedAddition.whitelist);
+        else return (false, certifiedAddition.whitelist);
     }
 
     function getTokenAmount(uint256 _weiAmount)

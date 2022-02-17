@@ -1,9 +1,16 @@
 const hre = require("hardhat");
 
+const {CALC1_TEST} = process.env;
+
 async function main() {
   // We get the contract to deploy
   const AdminContract = hre.ethers.getContractFactory("AdminContract");
-  const PresaleFactory = hre.ethers.getContractFactory("PresaleFactory");
+  //const Calculation1 = await hre.ethers.getContractFactory("Calculation1");
+  const PresaleFactory = hre.ethers.getContractFactory("PresaleFactory", {
+    libraries: {
+        Calculation1: CALC1_TEST
+    }
+  });
 
   const adminContract = await AdminContract.deployed();
   const presaleFactory = await PresaleFactory.deploy(adminContract.address);

@@ -9,7 +9,7 @@ import "./pancake-swap/libraries/TransferHelper.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "hardhat/console.sol";
+//import "hardhat/console.sol";
 
 contract PresaleFactory is IStructs, Context {
     IAdmin public immutable adminContract;

@@ -8,7 +8,7 @@ npx hardhat compile
 ```
 To deploy:
 ```shell
-node scripts/sample-script.js
+npx hardhat run --network <network> <deploy-script>.js
 ```
 
 To test:

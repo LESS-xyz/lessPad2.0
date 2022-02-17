@@ -9,7 +9,7 @@ require("@nomiclabs/hardhat-etherscan")
 require("solidity-coverage")
 require("hardhat-gas-reporter")
 
-const {INFURA_ID_PROJECT, ETHERSCAN_API_KEY, MNEMONIC, REPORT_GAS} = process.env;
+const {INFURA_ID_PROJECT, ETHERSCAN_API_KEY, BSCSCAN_API_KEY, MNEMONIC, REPORT_GAS} = process.env;
 
 const kovanURL = `https://kovan.infura.io/v3/${INFURA_ID_PROJECT}`
 const goerliURL = `https://goerli.infura.io/v3/${INFURA_ID_PROJECT}`
@@ -55,6 +55,13 @@ module.exports = {
       gasPrice: "auto",
       accounts: [`0x${MNEMONIC}`],
       saveDeployments: true
+    },
+    bsc: {
+      url: "https://bsc-dataseed.binance.org",
+      chainId: 56,
+      gasPrice: 10000000000,
+      accounts: [`0x${MNEMONIC}`],
+      saveDeployments: true
     }
   },
   gasReporter: {
@@ -62,7 +69,7 @@ module.exports = {
     currency: "USD"
   },
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
+    apiKey: BSCSCAN_API_KEY,
   },
   solidity: {
     compilers: [

@@ -7,12 +7,16 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract AdminContract is IAdmin, Ownable{
     uint256 public creationFeeBNB = 1 ether;
-    uint256 public feeOfRaisedFundsPercent = 2;
+    uint256 public feeOfRaisedFundsPercent;
     address public feeReceiver;
 
-    uint256 public generalMinInvestment;
+    uint256 public generalMinInvestment = 10 ** 17;
+
+    address[] public dexes;
 
     mapping(address => bool) public dexList;
+
+    mapping(address => uint256) private _dexIndexies;
 
     constructor(address _feeReceiver) {
         feeReceiver = _feeReceiver;
@@ -38,9 +42,29 @@ contract AdminContract is IAdmin, Ownable{
         require(_dex != address(0), "ZERO");
         if((_isValid && !dexList[_dex]) || (!_isValid && dexList[_dex])){
             if(_isValid)
+            {
                 require(_checkRouter(_dex), "INVALID DEX ADDRESS");
+                _dexIndexies[_dex] = dexes.length;
+                dexes.push(_dex);
+            }
+            else {
+                uint256 lastIndex = dexes.length - 1;
+                uint256 _dexIndex = _dexIndexies[_dex];
+                if(_dexIndex == lastIndex)
+                    dexes.pop();
+                else{
+                    address lastDex = dexes[lastIndex];
+                    dexes[_dexIndex] = lastDex;
+                    _dexIndexies[lastDex] = _dexIndex;
+                    dexes.pop();
+                }
+            }
             dexList[_dex] = _isValid;
         }
+    }
+
+    function availableDexes() external view returns(address[] memory){
+        return dexes;
     }
 
     function getCreationFee() external view override returns(uint256){
